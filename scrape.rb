@@ -10,6 +10,7 @@ include Mongo
 LOGIN_FORM = "https://www.courserank.com/stanford/main"
 CLASS_BASE_URL = "https://www.courserank.com/stanford/course?id="
 COMMENTS_BASE_URL = "https://www.courserank.com/stanford/target/comment_sort"
+GRADES_BASE_URL = "https://www.courserank.com/stanford/target/course_grades"
 
 username = ask("Username: ") { |q| q.echo = true }
 password = ask("Password: ") { |q| q.echo = "*" }
@@ -100,6 +101,42 @@ def getClassContents(m, id)
             result["comments"] = comments
         end
 
+        grades_source = m.post(GRADES_BASE_URL, { "course" => id })
+        gradesXML = Nokogiri::HTML(grades_source.body)
+        official = Array.new
+        officialGradesXML = gradesXML.css("official grade")
+        officialGradesXML.each do |officialGradeXML|
+            id = officialGradeXML.attr("id")
+            count = officialGradeXML.attr("count")
+            letter = officialGradeXML.at_css("view").content
+            points = officialGradeXML.at_css("points").content
+            grade = Hash.new
+            grade["id"] = id
+            grade["count"] = count
+            grade["letter"] = letter
+            grade["points"] = points
+            official << grade
+        end
+        unofficial = Array.new
+        unofficialGradesXML = gradesXML.css("unofficial grade")
+        unofficialGradesXML.each do |unofficialGradeXML|
+            id = unofficialGradeXML.attr("id")
+            count = unofficialGradeXML.attr("count")
+            letter = unofficialGradeXML.at_css("view").content
+            points = unofficialGradeXML.at_css("points").content
+            grade = Hash.new
+            grade["id"] = id
+            grade["count"] = count
+            grade["letter"] = letter
+            grade["points"] = points
+            unofficial << grade
+        end
+
+        grades = Hash.new
+        grades["official"] = official
+        grades["unofficial"] = unofficial
+        result["grades"] = grades
+
         return result
 
     rescue Mechanize::ResponseCodeError
@@ -108,11 +145,13 @@ def getClassContents(m, id)
 end
 
 queue = Queue.new
-(1..50000).to_a.each{|x| queue.push x}
+(0..60000).to_a.each{|x| queue.push x}
+(195000..200000).to_a.each{|x| queue.push x}
+(205000..222500).to_a.each{|x| queue.push x}
 
 client = MongoClient.new
 db = client["courseriver"]
-collection = db["courserank-th"]
+collection = db["courserank"]
 
 m = getMechanizeInstance(username, password)
 workers = (0...8).map do
@@ -120,6 +159,7 @@ workers = (0...8).map do
         begin
             while x = queue.pop(true)
                 contents = getClassContents(m, x.to_s)
+                print contents
                 unless contents.nil?
                     id = collection.insert(contents)
                     puts "Inserted " + x.to_s + " at " + id.to_s
@@ -130,4 +170,3 @@ workers = (0...8).map do
     end
 end; "ok"
 workers.map(&:join); "ok"
-
