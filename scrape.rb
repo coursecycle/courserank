@@ -101,8 +101,11 @@ def getClassContents(m, id)
             result["comments"] = comments
         end
 
+        # Get all of the grades
         grades_source = m.post(GRADES_BASE_URL, { "course" => id })
         gradesXML = Nokogiri::HTML(grades_source.body)
+
+        # Official grades are based off of historical data it seems
         official = Array.new
         officialGradesXML = gradesXML.css("official grade")
         officialGradesXML.each do |officialGradeXML|
@@ -117,6 +120,8 @@ def getClassContents(m, id)
             grade["points"] = points
             official << grade
         end
+
+        # Unofficial grades are user-submitted
         unofficial = Array.new
         unofficialGradesXML = gradesXML.css("unofficial grade")
         unofficialGradesXML.each do |unofficialGradeXML|
@@ -144,15 +149,19 @@ def getClassContents(m, id)
 
 end
 
+# Queues are thread safe in Ruby.
+# This defines the ranges that we need to cover.
 queue = Queue.new
 (0..60000).to_a.each{|x| queue.push x}
 (195000..200000).to_a.each{|x| queue.push x}
 (205000..222500).to_a.each{|x| queue.push x}
 
+# Connect to the Mongo server
 client = MongoClient.new
 db = client["courseriver"]
 collection = db["courserank"]
 
+# Generate thread pool that pulls items off the queue
 m = getMechanizeInstance(username, password)
 workers = (0...8).map do
     Thread.new do
