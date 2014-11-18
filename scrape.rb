@@ -159,7 +159,6 @@ workers = (0...8).map do
         begin
             while x = queue.pop(true)
                 contents = getClassContents(m, x.to_s)
-                print contents
                 unless contents.nil?
                     id = collection.insert(contents)
                     puts "Inserted " + x.to_s + " at " + id.to_s
